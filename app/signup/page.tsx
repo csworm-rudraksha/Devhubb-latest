@@ -1,22 +1,36 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useTransition } from "react"
 import { Code2, Github } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { signupAction } from "@/app/actions/auth"
+import { createClient } from "@/lib/supabase/client"
 
 export default function SignupPage() {
-  const router = useRouter()
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [name, setName] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
 
-  function handleSignup(e: React.FormEvent) {
-    e.preventDefault()
-    router.push("/onboarding")
+  async function handleSignup(formData: FormData) {
+    setError(null)
+    startTransition(async () => {
+      const result = await signupAction(formData)
+      if (result?.error) {
+        setError(result.error)
+      }
+    })
+  }
+
+  async function handleGitHubLogin() {
+    const supabase = createClient()
+    await supabase.auth.signInWithOAuth({
+      provider: "github",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    })
   }
 
   return (
@@ -33,41 +47,27 @@ export default function SignupPage() {
           <p className="mt-1 text-sm text-muted-foreground">Join the developer community</p>
         </div>
 
-        <form onSubmit={handleSignup} className="flex flex-col gap-4">
+        {error && (
+          <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            {error}
+          </div>
+        )}
+
+        <form action={handleSignup} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="name">Full name</Label>
-            <Input
-              id="name"
-              placeholder="Rudraksha Sharma"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
+            <Input id="name" name="name" placeholder="Rudraksha Sharma" required />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+            <Input id="email" name="email" type="email" placeholder="you@example.com" required />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="Min 8 characters"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <Input id="password" name="password" type="password" placeholder="Min 8 characters" required minLength={6} />
           </div>
-          <Button type="submit" className="mt-2 w-full">
-            Create account
+          <Button type="submit" className="mt-2 w-full" disabled={isPending}>
+            {isPending ? "Creating account..." : "Create account"}
           </Button>
         </form>
 
@@ -80,11 +80,7 @@ export default function SignupPage() {
               <span className="bg-background px-2 text-muted-foreground">or continue with</span>
             </div>
           </div>
-          <Button
-            variant="outline"
-            className="mt-4 w-full gap-2"
-            onClick={() => router.push("/onboarding")}
-          >
+          <Button variant="outline" className="mt-4 w-full gap-2" onClick={handleGitHubLogin}>
             <Github className="h-4 w-4" />
             GitHub
           </Button>

@@ -1,22 +1,36 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useTransition } from "react"
 import { Code2, Github } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { loginAction } from "@/app/actions/auth"
+import { createClient } from "@/lib/supabase/client"
 
 export default function LoginPage() {
-  const router = useRouter()
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
 
-  function handleLogin(e: React.FormEvent) {
-    e.preventDefault()
-    // Dummy login — just redirect to dashboard
-    router.push("/dashboard/overview")
+  async function handleLogin(formData: FormData) {
+    setError(null)
+    startTransition(async () => {
+      const result = await loginAction(formData)
+      if (result?.error) {
+        setError(result.error)
+      }
+    })
+  }
+
+  async function handleGitHubLogin() {
+    const supabase = createClient()
+    await supabase.auth.signInWithOAuth({
+      provider: "github",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    })
   }
 
   return (
@@ -33,31 +47,23 @@ export default function LoginPage() {
           <p className="mt-1 text-sm text-muted-foreground">Sign in to your account</p>
         </div>
 
-        <form onSubmit={handleLogin} className="flex flex-col gap-4">
+        {error && (
+          <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            {error}
+          </div>
+        )}
+
+        <form action={handleLogin} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+            <Input id="email" name="email" type="email" placeholder="you@example.com" required />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="Your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <Input id="password" name="password" type="password" placeholder="Your password" required />
           </div>
-          <Button type="submit" className="mt-2 w-full">
-            Sign in
+          <Button type="submit" className="mt-2 w-full" disabled={isPending}>
+            {isPending ? "Signing in..." : "Sign in"}
           </Button>
         </form>
 
@@ -70,11 +76,7 @@ export default function LoginPage() {
               <span className="bg-background px-2 text-muted-foreground">or continue with</span>
             </div>
           </div>
-          <Button
-            variant="outline"
-            className="mt-4 w-full gap-2"
-            onClick={() => router.push("/dashboard/overview")}
-          >
+          <Button variant="outline" className="mt-4 w-full gap-2" onClick={handleGitHubLogin}>
             <Github className="h-4 w-4" />
             GitHub
           </Button>

@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus, FileText, Clock } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect, useTransition } from "react"
 import {
   Dialog,
   DialogContent,
@@ -15,25 +15,80 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { createClient } from "@/lib/supabase/client"
+import { createNotebookAction } from "@/app/actions/data"
+
+interface Notebook {
+  id: string
+  title: string
+  emoji: string
+  created_at: string
+  updated_at: string
+  page_count?: number
+}
 
 export default function NotesPage() {
-  const [notebooks, setNotebooks] = useState(DUMMY_NOTEBOOKS)
+  const [notebooks, setNotebooks] = useState<Notebook[]>([])
   const [newTitle, setNewTitle] = useState("")
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [isPending, startTransition] = useTransition()
+
+  useEffect(() => {
+    async function fetchNotebooks() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (user) {
+        const { data } = await supabase
+          .from("notebooks")
+          .select("*")
+          .order("updated_at", { ascending: false })
+
+        if (data && data.length > 0) {
+          setNotebooks(data)
+          setLoading(false)
+          return
+        }
+      }
+
+      // Fallback to dummy data
+      setNotebooks(
+        DUMMY_NOTEBOOKS.map((nb) => ({
+          id: nb.id,
+          title: nb.title,
+          emoji: "📓",
+          created_at: nb.createdAt,
+          updated_at: nb.updatedAt,
+          page_count: nb.pageCount,
+        }))
+      )
+      setLoading(false)
+    }
+    fetchNotebooks()
+  }, [])
 
   function createNotebook() {
     if (!newTitle.trim()) return
-    const nb = {
-      id: `nb-${Date.now()}`,
-      title: newTitle.trim(),
-      ownerId: "u-001",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      pageCount: 0,
-    }
-    setNotebooks([nb, ...notebooks])
-    setNewTitle("")
-    setDialogOpen(false)
+    startTransition(async () => {
+      const result = await createNotebookAction(newTitle.trim())
+      if (result.data) {
+        setNotebooks([result.data, ...notebooks])
+      }
+      setNewTitle("")
+      setDialogOpen(false)
+    })
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Notes</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -67,7 +122,9 @@ export default function NotesPage() {
                   onKeyDown={(e) => e.key === "Enter" && createNotebook()}
                 />
               </div>
-              <Button onClick={createNotebook}>Create</Button>
+              <Button onClick={createNotebook} disabled={isPending}>
+                {isPending ? "Creating..." : "Create"}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -84,14 +141,11 @@ export default function NotesPage() {
                 <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
                   {nb.title}
                 </h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {nb.pageCount} {nb.pageCount === 1 ? "page" : "pages"}
-                </p>
                 <div className="mt-3 flex items-center gap-1 text-xs text-muted-foreground">
                   <Clock className="h-3 w-3" />
                   <span>
                     Updated{" "}
-                    {new Date(nb.updatedAt).toLocaleDateString("en-US", {
+                    {new Date(nb.updated_at).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
                     })}

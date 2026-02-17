@@ -20,23 +20,116 @@ import {
   Twitter,
 } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect, useTransition } from "react"
+import { createClient } from "@/lib/supabase/client"
+import { updateProfileAction, updateProfileVisibilityAction } from "@/app/actions/auth"
+
+interface Profile {
+  full_name: string
+  handle: string
+  college: string
+  city: string
+  bio: string
+  github_url: string
+  linkedin_url: string
+  twitter_url: string
+  phone_number: string
+  is_public: boolean
+}
 
 export default function ProfilePage() {
-  const user = DUMMY_USER
-  const [isPublic, setIsPublic] = useState(user.isPublic)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [isPublic, setIsPublic] = useState(true)
   const [copied, setCopied] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [isPending, startTransition] = useTransition()
 
-  const initials = user.fullName
+  useEffect(() => {
+    async function fetchProfile() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (user) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single()
+
+        if (data) {
+          setProfile(data)
+          setIsPublic(data.is_public ?? true)
+          setLoading(false)
+          return
+        }
+      }
+
+      // Fallback to dummy
+      setProfile({
+        full_name: DUMMY_USER.fullName,
+        handle: DUMMY_USER.handle,
+        college: DUMMY_USER.college,
+        city: DUMMY_USER.city,
+        bio: DUMMY_USER.bio,
+        github_url: DUMMY_USER.githubUrl,
+        linkedin_url: DUMMY_USER.linkedinUrl,
+        twitter_url: DUMMY_USER.twitterUrl,
+        phone_number: DUMMY_USER.phoneNumber,
+        is_public: DUMMY_USER.isPublic,
+      })
+      setLoading(false)
+    }
+    fetchProfile()
+  }, [])
+
+  if (loading || !profile) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Profile</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const initials = (profile.full_name || "U")
     .split(" ")
     .map((n) => n[0])
     .join("")
 
   function handleCopyLink() {
-    navigator.clipboard.writeText(`https://devhubb.io/u/${user.handle}`)
+    navigator.clipboard.writeText(`${window.location.origin}/u/${profile!.handle}`)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  function handleSaveProfile(formData: FormData) {
+    startTransition(async () => {
+      const result = await updateProfileAction(formData)
+      if (result.success) {
+        setProfile({
+          ...profile!,
+          full_name: formData.get("full_name") as string,
+          handle: formData.get("handle") as string,
+          college: formData.get("college") as string,
+          city: formData.get("city") as string,
+          bio: formData.get("bio") as string,
+          github_url: formData.get("github_url") as string,
+          linkedin_url: formData.get("linkedin_url") as string,
+          twitter_url: formData.get("twitter_url") as string,
+        })
+        setEditing(false)
+      }
+    })
+  }
+
+  function handleTogglePublic(checked: boolean) {
+    setIsPublic(checked)
+    startTransition(async () => {
+      await updateProfileVisibilityAction(checked)
+    })
   }
 
   return (
@@ -52,7 +145,7 @@ export default function ProfilePage() {
             {copied ? "Copied" : "Share Profile"}
           </Button>
           <Button variant="outline" asChild className="gap-2">
-            <Link href={`/u/${user.handle}`} target="_blank">
+            <Link href={`/u/${profile.handle}`} target="_blank">
               <ExternalLink className="h-4 w-4" />
               Public Page
             </Link>
@@ -61,7 +154,6 @@ export default function ProfilePage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
-        {/* Profile details card */}
         <Card className="border-border bg-card">
           <CardHeader className="flex-row items-center justify-between">
             <CardTitle className="text-base">Profile Details</CardTitle>
@@ -75,87 +167,100 @@ export default function ProfilePage() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-col gap-6">
-              {/* Avatar and name row */}
               <div className="flex items-center gap-4">
                 <Avatar className="h-16 w-16 border-2 border-border">
                   <AvatarFallback className="bg-primary/10 text-lg text-primary">{initials}</AvatarFallback>
                 </Avatar>
                 <div>
-                  <h2 className="text-lg font-semibold text-foreground">{user.fullName}</h2>
-                  <p className="text-sm text-primary">@{user.handle}</p>
+                  <h2 className="text-lg font-semibold text-foreground">{profile.full_name}</h2>
+                  <p className="text-sm text-primary">@{profile.handle}</p>
                 </div>
               </div>
 
               {editing ? (
-                <div className="flex flex-col gap-4">
+                <form action={handleSaveProfile} className="flex flex-col gap-4">
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="flex flex-col gap-2">
                       <Label>Full name</Label>
-                      <Input defaultValue={user.fullName} />
+                      <Input name="full_name" defaultValue={profile.full_name} />
                     </div>
                     <div className="flex flex-col gap-2">
                       <Label>Handle</Label>
-                      <Input defaultValue={user.handle} />
+                      <Input name="handle" defaultValue={profile.handle} />
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
                     <Label>Bio</Label>
-                    <Textarea defaultValue={user.bio} rows={3} />
+                    <Textarea name="bio" defaultValue={profile.bio || ""} rows={3} />
                   </div>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="flex flex-col gap-2">
                       <Label>College / Company</Label>
-                      <Input defaultValue={user.college} />
+                      <Input name="college" defaultValue={profile.college || ""} />
                     </div>
                     <div className="flex flex-col gap-2">
                       <Label>City</Label>
-                      <Input defaultValue={user.city} />
+                      <Input name="city" defaultValue={profile.city || ""} />
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
                     <Label>GitHub URL</Label>
-                    <Input defaultValue={user.githubUrl} />
+                    <Input name="github_url" defaultValue={profile.github_url || ""} />
                   </div>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="flex flex-col gap-2">
                       <Label>LinkedIn URL</Label>
-                      <Input defaultValue={user.linkedinUrl} />
+                      <Input name="linkedin_url" defaultValue={profile.linkedin_url || ""} />
                     </div>
                     <div className="flex flex-col gap-2">
                       <Label>Twitter URL</Label>
-                      <Input defaultValue={user.twitterUrl} />
+                      <Input name="twitter_url" defaultValue={profile.twitter_url || ""} />
                     </div>
                   </div>
-                  <Button className="self-start" onClick={() => setEditing(false)}>
-                    Save Changes
+                  <div className="flex flex-col gap-2">
+                    <Label>Phone</Label>
+                    <Input name="phone_number" defaultValue={profile.phone_number || ""} />
+                  </div>
+                  <Button type="submit" className="self-start" disabled={isPending}>
+                    {isPending ? "Saving..." : "Save Changes"}
                   </Button>
-                </div>
+                </form>
               ) : (
                 <div className="flex flex-col gap-4">
-                  <p className="text-sm text-muted-foreground leading-relaxed">{user.bio}</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{profile.bio || "No bio yet"}</p>
                   <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1.5">
-                      <Building2 className="h-4 w-4" />
-                      {user.college}
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <MapPin className="h-4 w-4" />
-                      {user.city}
-                    </span>
+                    {profile.college && (
+                      <span className="flex items-center gap-1.5">
+                        <Building2 className="h-4 w-4" />
+                        {profile.college}
+                      </span>
+                    )}
+                    {profile.city && (
+                      <span className="flex items-center gap-1.5">
+                        <MapPin className="h-4 w-4" />
+                        {profile.city}
+                      </span>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-3">
-                    <Badge variant="secondary" className="gap-1.5">
-                      <Github className="h-3.5 w-3.5" />
-                      GitHub
-                    </Badge>
-                    <Badge variant="secondary" className="gap-1.5">
-                      <Linkedin className="h-3.5 w-3.5" />
-                      LinkedIn
-                    </Badge>
-                    <Badge variant="secondary" className="gap-1.5">
-                      <Twitter className="h-3.5 w-3.5" />
-                      Twitter
-                    </Badge>
+                    {profile.github_url && (
+                      <Badge variant="secondary" className="gap-1.5">
+                        <Github className="h-3.5 w-3.5" />
+                        GitHub
+                      </Badge>
+                    )}
+                    {profile.linkedin_url && (
+                      <Badge variant="secondary" className="gap-1.5">
+                        <Linkedin className="h-3.5 w-3.5" />
+                        LinkedIn
+                      </Badge>
+                    )}
+                    {profile.twitter_url && (
+                      <Badge variant="secondary" className="gap-1.5">
+                        <Twitter className="h-3.5 w-3.5" />
+                        Twitter
+                      </Badge>
+                    )}
                   </div>
                 </div>
               )}
@@ -163,16 +268,15 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        {/* Right sidebar: visibility + stats summary */}
         <div className="flex flex-col gap-4">
           <Card className="border-border bg-card">
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-foreground">Public Profile</p>
-                  <p className="text-xs text-muted-foreground">Visible at /u/{user.handle}</p>
+                  <p className="text-xs text-muted-foreground">Visible at /u/{profile.handle}</p>
                 </div>
-                <Switch checked={isPublic} onCheckedChange={setIsPublic} />
+                <Switch checked={isPublic} onCheckedChange={handleTogglePublic} />
               </div>
             </CardContent>
           </Card>

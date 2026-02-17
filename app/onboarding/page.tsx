@@ -1,35 +1,26 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useTransition } from "react"
 import { Code2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import Link from "next/link"
+import { saveOnboardingAction } from "@/app/actions/auth"
 
 export default function OnboardingPage() {
-  const router = useRouter()
-  const [form, setForm] = useState({
-    fullName: "",
-    handle: "",
-    college: "",
-    city: "",
-    bio: "",
-    githubUrl: "",
-    linkedinUrl: "",
-    twitterUrl: "",
-    phone: "",
-  })
+  const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
 
-  function update(key: string, value: string) {
-    setForm((prev) => ({ ...prev, [key]: value }))
-  }
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    router.push("/dashboard/overview")
+  function handleSubmit(formData: FormData) {
+    setError(null)
+    startTransition(async () => {
+      const result = await saveOnboardingAction(formData)
+      if (result?.error) {
+        setError(result.error)
+      }
+    })
   }
 
   return (
@@ -46,57 +37,63 @@ export default function OnboardingPage() {
           <p className="mt-1 text-sm text-muted-foreground">Tell us about yourself so others can find you</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        {error && (
+          <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            {error}
+          </div>
+        )}
+
+        <form action={handleSubmit} className="flex flex-col gap-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
               <Label htmlFor="fullName">Full name</Label>
-              <Input id="fullName" placeholder="Rudraksha Sharma" value={form.fullName} onChange={(e) => update("fullName", e.target.value)} required />
+              <Input id="fullName" name="fullName" placeholder="Rudraksha Sharma" required />
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="handle">Handle</Label>
-              <Input id="handle" placeholder="rudraksha" value={form.handle} onChange={(e) => update("handle", e.target.value)} required />
+              <Input id="handle" name="handle" placeholder="rudraksha" required />
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
               <Label htmlFor="college">College / Company</Label>
-              <Input id="college" placeholder="IIT Delhi" value={form.college} onChange={(e) => update("college", e.target.value)} />
+              <Input id="college" name="college" placeholder="IIT Delhi" />
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="city">City</Label>
-              <Input id="city" placeholder="New Delhi" value={form.city} onChange={(e) => update("city", e.target.value)} />
+              <Input id="city" name="city" placeholder="New Delhi" />
             </div>
           </div>
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="bio">Bio</Label>
-            <Textarea id="bio" placeholder="A few words about yourself..." value={form.bio} onChange={(e) => update("bio", e.target.value)} rows={3} />
+            <Textarea id="bio" name="bio" placeholder="A few words about yourself..." rows={3} />
           </div>
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="githubUrl">GitHub URL</Label>
-            <Input id="githubUrl" placeholder="https://github.com/username" value={form.githubUrl} onChange={(e) => update("githubUrl", e.target.value)} />
+            <Input id="githubUrl" name="githubUrl" placeholder="https://github.com/username" />
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
               <Label htmlFor="linkedinUrl">LinkedIn URL</Label>
-              <Input id="linkedinUrl" placeholder="https://linkedin.com/in/..." value={form.linkedinUrl} onChange={(e) => update("linkedinUrl", e.target.value)} />
+              <Input id="linkedinUrl" name="linkedinUrl" placeholder="https://linkedin.com/in/..." />
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="twitterUrl">Twitter / X URL</Label>
-              <Input id="twitterUrl" placeholder="https://twitter.com/..." value={form.twitterUrl} onChange={(e) => update("twitterUrl", e.target.value)} />
+              <Input id="twitterUrl" name="twitterUrl" placeholder="https://twitter.com/..." />
             </div>
           </div>
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="phone">Phone number</Label>
-            <Input id="phone" placeholder="+91 98765 43210" value={form.phone} onChange={(e) => update("phone", e.target.value)} />
+            <Input id="phone" name="phone" placeholder="+91 98765 43210" />
           </div>
 
-          <Button type="submit" className="mt-4 w-full">
-            Complete Setup
+          <Button type="submit" className="mt-4 w-full" disabled={isPending}>
+            {isPending ? "Saving..." : "Complete Setup"}
           </Button>
         </form>
       </div>

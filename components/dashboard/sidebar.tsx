@@ -14,7 +14,8 @@ import {
   ChevronRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { useState } from "react"
+import { useState, useTransition } from "react"
+import { signOutAction } from "@/app/actions/auth"
 
 const navItems = [
   { href: "/dashboard/overview", label: "Overview", icon: BarChart3 },
@@ -26,6 +27,13 @@ const navItems = [
 export function DashboardSidebar() {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  const [isPending, startTransition] = useTransition()
+
+  function handleSignOut() {
+    startTransition(async () => {
+      await signOutAction()
+    })
+  }
 
   return (
     <aside
@@ -93,12 +101,11 @@ export function DashboardSidebar() {
             "mt-1 w-full justify-start gap-3 text-sidebar-foreground/70 hover:text-sidebar-foreground",
             collapsed && "justify-center px-0"
           )}
-          asChild
+          disabled={isPending}
+          onClick={handleSignOut}
         >
-          <Link href="/">
-            <LogOut className="h-4 w-4 shrink-0" />
-            {!collapsed && <span>Log out</span>}
-          </Link>
+          <LogOut className="h-4 w-4 shrink-0" />
+          {!collapsed && <span>{isPending ? "Signing out..." : "Log out"}</span>}
         </Button>
       </div>
     </aside>

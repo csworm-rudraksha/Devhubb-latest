@@ -1,12 +1,9 @@
-"use client"
-
-import { DUMMY_USER } from "@/lib/dummy-data"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-export function DashboardTopbar() {
-  const initials = DUMMY_USER.fullName
+export function DashboardTopbar({ userName, handle }: { userName: string; handle: string }) {
+  const initials = userName
     .split(" ")
     .map((n) => n[0])
     .join("")
@@ -15,7 +12,7 @@ export function DashboardTopbar() {
     <header className="flex h-16 items-center justify-between border-b border-border bg-card px-6">
       <div>
         <p className="text-sm text-muted-foreground">
-          Welcome back, <span className="font-medium text-foreground">{DUMMY_USER.fullName}</span>
+          Welcome back, <span className="font-medium text-foreground">{userName}</span>
         </p>
       </div>
       <div className="flex items-center gap-3">
