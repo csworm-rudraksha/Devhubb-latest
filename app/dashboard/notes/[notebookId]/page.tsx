@@ -12,6 +12,7 @@ import { createNotebookPageAction, updatePageContentAction } from "@/app/actions
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -174,6 +175,7 @@ export default function NotebookDetailPage({
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create Page</DialogTitle>
+                <DialogDescription>Add a new page to this notebook.</DialogDescription>
               </DialogHeader>
               <div className="flex flex-col gap-4 pt-2">
                 <div className="flex flex-col gap-2">
