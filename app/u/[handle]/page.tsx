@@ -19,20 +19,56 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { createClient } from "@/lib/supabase/server"
+import { notFound } from "next/navigation"
 
-export default function PublicProfilePage() {
-  const user = DUMMY_USER
+export default async function PublicProfilePage({
+  params,
+}: {
+  params: Promise<{ handle: string }>
+}) {
+  const { handle } = await params
+  const supabase = await createClient()
+
+  // Try to fetch from Supabase
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("handle", handle)
+    .eq("is_public", true)
+    .single()
+
+  // Build user object from profile or fallback to dummy
+  const user = profile
+    ? {
+        fullName: profile.full_name || handle,
+        handle: profile.handle || handle,
+        bio: profile.bio || "",
+        college: profile.college || "",
+        city: profile.city || "",
+        githubUrl: profile.github_url || "#",
+        linkedinUrl: profile.linkedin_url || "#",
+        twitterUrl: profile.twitter_url || "#",
+      }
+    : handle === DUMMY_USER.handle
+      ? DUMMY_USER
+      : null
+
+  if (!user) {
+    notFound()
+  }
+
+  // For now, always use dummy stats (GitHub/LeetCode APIs can be wired later)
   const gh = DUMMY_GITHUB_STATS
   const lc = DUMMY_LEETCODE_STATS
 
   const initials = user.fullName
     .split(" ")
-    .map((n) => n[0])
+    .map((n: string) => n[0])
     .join("")
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Top nav */}
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex h-14 max-w-3xl items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-2">
@@ -48,46 +84,56 @@ export default function PublicProfilePage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-10">
-        {/* Profile header */}
         <div className="flex flex-col items-center text-center">
           <Avatar className="h-20 w-20 border-2 border-border">
             <AvatarFallback className="bg-primary/10 text-xl text-primary">{initials}</AvatarFallback>
           </Avatar>
           <h1 className="mt-4 text-2xl font-bold text-foreground">{user.fullName}</h1>
           <p className="text-sm text-primary">@{user.handle}</p>
-          <p className="mt-3 max-w-md text-sm text-muted-foreground leading-relaxed">{user.bio}</p>
+          {user.bio && (
+            <p className="mt-3 max-w-md text-sm text-muted-foreground leading-relaxed">{user.bio}</p>
+          )}
 
           <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <Building2 className="h-4 w-4" />
-              {user.college}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <MapPin className="h-4 w-4" />
-              {user.city}
-            </span>
+            {user.college && (
+              <span className="flex items-center gap-1.5">
+                <Building2 className="h-4 w-4" />
+                {user.college}
+              </span>
+            )}
+            {user.city && (
+              <span className="flex items-center gap-1.5">
+                <MapPin className="h-4 w-4" />
+                {user.city}
+              </span>
+            )}
           </div>
 
           <div className="mt-4 flex items-center gap-3">
-            <Link href={user.githubUrl} target="_blank" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-              <Github className="h-4 w-4" />
-              GitHub
-              <ExternalLink className="h-3 w-3" />
-            </Link>
-            <Link href={user.linkedinUrl} target="_blank" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-              <Linkedin className="h-4 w-4" />
-              LinkedIn
-              <ExternalLink className="h-3 w-3" />
-            </Link>
-            <Link href={user.twitterUrl} target="_blank" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-              <Twitter className="h-4 w-4" />
-              Twitter
-              <ExternalLink className="h-3 w-3" />
-            </Link>
+            {user.githubUrl && user.githubUrl !== "#" && (
+              <Link href={user.githubUrl} target="_blank" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <Github className="h-4 w-4" />
+                GitHub
+                <ExternalLink className="h-3 w-3" />
+              </Link>
+            )}
+            {user.linkedinUrl && user.linkedinUrl !== "#" && (
+              <Link href={user.linkedinUrl} target="_blank" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <Linkedin className="h-4 w-4" />
+                LinkedIn
+                <ExternalLink className="h-3 w-3" />
+              </Link>
+            )}
+            {user.twitterUrl && user.twitterUrl !== "#" && (
+              <Link href={user.twitterUrl} target="_blank" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <Twitter className="h-4 w-4" />
+                Twitter
+                <ExternalLink className="h-3 w-3" />
+              </Link>
+            )}
           </div>
         </div>
 
-        {/* Stats grid */}
         <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <MiniStatCard icon={GitFork} label="Repos" value={gh.publicRepos} />
           <MiniStatCard icon={Star} label="Stars" value={gh.totalStars.toLocaleString()} />
@@ -106,7 +152,6 @@ export default function PublicProfilePage() {
           </Card>
         </div>
 
-        {/* Languages */}
         <Card className="mt-6 border-border bg-card">
           <CardContent className="p-5">
             <p className="mb-4 text-sm font-medium text-muted-foreground">Top Languages</p>

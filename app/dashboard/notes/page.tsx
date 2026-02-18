@@ -9,6 +9,7 @@ import { useState, useEffect, useTransition } from "react"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -110,6 +111,7 @@ export default function NotesPage() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create Notebook</DialogTitle>
+              <DialogDescription>Create a new notebook to organize your notes.</DialogDescription>
             </DialogHeader>
             <div className="flex flex-col gap-4 pt-2">
               <div className="flex flex-col gap-2">
@@ -143,7 +145,7 @@ export default function NotesPage() {
                 </h3>
                 <div className="mt-3 flex items-center gap-1 text-xs text-muted-foreground">
                   <Clock className="h-3 w-3" />
-                  <span>
+                  <span suppressHydrationWarning>
                     Updated{" "}
                     {new Date(nb.updated_at).toLocaleDateString("en-US", {
                       month: "short",
