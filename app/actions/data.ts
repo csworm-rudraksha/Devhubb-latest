@@ -90,6 +90,23 @@ export async function saveRoomCodeAction(roomId: string, code: string) {
   return { success: true }
 }
 
+export async function updateRoomLanguageAction(roomId: string, language: string) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { error: "Not authenticated" }
+
+  const { error } = await supabase
+    .from("collab_rooms")
+    .update({ language, updated_at: new Date().toISOString() })
+    .eq("id", roomId)
+
+  if (error) return { error: error.message }
+  return { success: true }
+}
+
 export async function deleteNotebookAction(notebookId: string) {
   const supabase = await createClient()
   const {

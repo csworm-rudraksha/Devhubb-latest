@@ -8,7 +8,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ArrowLeft, Copy, Save, Users, Check } from "lucide-react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
-import { saveRoomCodeAction } from "@/app/actions/data"
+import { saveRoomCodeAction, updateRoomLanguageAction } from "@/app/actions/data"
+import { CodeEditor } from "@/components/code-editor"
 
 const PRESENCE_USERS = [
   { name: "You", color: "bg-chart-1" },
@@ -29,6 +30,7 @@ export default function CodingRoomPage({
   const { roomId } = use(params)
   const [room, setRoom] = useState<Room | null>(null)
   const [code, setCode] = useState("")
+  const [language, setLanguage] = useState("javascript")
   const [copied, setCopied] = useState(false)
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -49,6 +51,7 @@ export default function CodingRoomPage({
         if (data) {
           setRoom(data)
           setCode(data.code || "// Start coding...\n")
+          setLanguage(data.language || "javascript")
           setLoading(false)
           return
         }
@@ -64,6 +67,7 @@ export default function CodingRoomPage({
           code: dummyRoom.content,
         })
         setCode(dummyRoom.content)
+        setLanguage(dummyRoom.language)
       }
       setLoading(false)
     }
@@ -103,10 +107,17 @@ export default function CodingRoomPage({
     })
   }
 
+  function handleLanguageChange(newLanguage: string) {
+    setLanguage(newLanguage)
+    startTransition(async () => {
+      await updateRoomLanguageAction(roomId, newLanguage)
+    })
+  }
+
   return (
     <div className="flex h-[calc(100vh-8rem)] flex-col gap-4">
       {/* Top bar */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" asChild>
             <Link href="/dashboard/coding">
@@ -115,16 +126,16 @@ export default function CodingRoomPage({
           </Button>
           <div>
             <h1 className="text-lg font-bold text-foreground">{room.name}</h1>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="font-mono text-xs">{room.language}</Badge>
-              <span className="text-xs text-muted-foreground">Collaborative</span>
+            <div className="flex flex-wrap items-center gap-2 mt-1">
+              <Badge variant="secondary" className="font-mono text-xs">{language}</Badge>
+              <span className="text-xs text-muted-foreground">Real-time Editor</span>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 md:gap-3">
           <div className="flex items-center gap-1">
-            <Users className="mr-1 h-4 w-4 text-muted-foreground" />
+            <Users className="h-4 w-4 text-muted-foreground" />
             <div className="flex -space-x-2">
               {PRESENCE_USERS.map((u) => (
                 <Avatar key={u.name} className="h-7 w-7 border-2 border-background">
@@ -138,39 +149,26 @@ export default function CodingRoomPage({
 
           <Button variant="outline" size="sm" className="gap-2" onClick={handleCopyLink}>
             {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-            {copied ? "Copied" : "Share Link"}
+            <span className="hidden sm:inline">{copied ? "Copied" : "Share"}</span>
           </Button>
 
           <Button size="sm" className="gap-2" onClick={handleSave} disabled={isPending}>
             {saved ? <Check className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
-            {saved ? "Saved" : isPending ? "Saving..." : "Save"}
+            <span className="hidden sm:inline">{saved ? "Saved" : isPending ? "Saving..." : "Save"}</span>
           </Button>
         </div>
       </div>
 
       {/* Code editor area */}
       <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card">
-        <div className="flex items-center justify-between border-b border-border bg-secondary px-4 py-2">
-          <div className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded-full bg-destructive/50" />
-            <div className="h-3 w-3 rounded-full bg-chart-3/50" />
-            <div className="h-3 w-3 rounded-full bg-chart-1/50" />
-          </div>
-          <span className="text-xs text-muted-foreground font-mono">{room.name}.{room.language === "javascript" ? "js" : room.language}</span>
-        </div>
-        <div className="flex flex-1 overflow-hidden">
-          <div className="flex flex-col bg-secondary/50 py-4 pl-4 pr-3 text-right font-mono text-xs text-muted-foreground select-none">
-            {code.split("\n").map((_, i) => (
-              <span key={i} className="leading-6">{i + 1}</span>
-            ))}
-          </div>
-          <textarea
-            value={code}
-            onChange={(e) => { setCode(e.target.value); setSaved(false) }}
-            className="flex-1 resize-none bg-transparent p-4 font-mono text-sm text-foreground leading-6 focus:outline-none"
-            spellCheck={false}
-          />
-        </div>
+        <CodeEditor
+          code={code}
+          language={language}
+          onCodeChange={setCode}
+          onLanguageChange={handleLanguageChange}
+          height="100%"
+          roomName={room.name}
+        />
       </div>
     </div>
   )
