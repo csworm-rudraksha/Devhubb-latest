@@ -1,6 +1,7 @@
 "use client"
 
 import { use, useState, useEffect, useTransition } from "react"
+import MDEditor from "@uiw/react-md-editor"
 import { DUMMY_NOTEBOOKS, DUMMY_PAGES } from "@/lib/dummy-data"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -19,6 +20,8 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import "@uiw/react-md-editor/markdown-editor.css"
+import "@uiw/react-markdown-preview/markdown.css"
 
 interface NotebookPage {
   id: string
@@ -231,12 +234,26 @@ export default function NotebookDetailPage({
                     </Button>
                   </div>
                 </div>
-                <textarea
-                  value={editContent}
-                  onChange={(e) => { setEditContent(e.target.value); setSaved(false) }}
-                  className="min-h-[400px] w-full resize-none rounded-lg bg-secondary p-4 font-mono text-sm text-foreground leading-relaxed focus:outline-none focus:ring-1 focus:ring-primary"
-                  spellCheck={false}
-                />
+                <div data-color-mode="dark" className="rounded-lg overflow-hidden border border-border">
+                  <MDEditor
+                    value={editContent}
+                    onChange={(val) => {
+                      setEditContent(val || "")
+                      setSaved(false)
+                    }}
+                    preview="edit"
+                    height={400}
+                    visibleDragbar={false}
+                    textareaProps={{
+                      spellCheck: false,
+                    }}
+                    className="rounded-lg"
+                    style={{
+                      backgroundColor: "hsl(var(--secondary))",
+                      borderRadius: "calc(var(--radius) - 2px)",
+                    }}
+                  />
+                </div>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-20">
