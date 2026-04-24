@@ -40,6 +40,8 @@ export default function CodingRoomPage({
 
   // Fetch initial room data and set up real-time subscription
   useEffect(() => {
+    let subscription: any = null
+
     async function fetchRoom() {
       const supabase = createClient()
       const {
@@ -60,8 +62,8 @@ export default function CodingRoomPage({
           setLanguage(data.language || "javascript")
           setLoading(false)
 
-          // Set up real-time subscription for changes
-          const subscription = supabase
+          // Set up real-time subscription for changes from other users
+          subscription = supabase
             .channel(`room:${roomId}`)
             .on(
               "postgres_changes",
@@ -73,23 +75,27 @@ export default function CodingRoomPage({
               },
               (payload: any) => {
                 if (payload.new) {
-                  console.log("[v0] Real-time update received:", payload.new)
                   setExternalChange(true)
                   setCode(payload.new.code || "")
                   setLanguage(payload.new.language || "javascript")
+                  setRoom((prev) => prev ? { ...prev, ...payload.new } : null)
                   // Clear the external change indicator after 2 seconds
                   setTimeout(() => setExternalChange(false), 2000)
                 }
               }
             )
-            .subscribe()
+            .subscribe((status: string) => {
+              if (status === "SUBSCRIBED") {
+              }
+            })
 
           return () => {
-            subscription.unsubscribe()
+            if (subscription) {
+              subscription.unsubscribe()
+            }
           }
         }
       } catch (error) {
-        console.log("[v0] Error fetching from Supabase, using dummy data")
       }
 
       // Fallback to dummy data
@@ -108,6 +114,12 @@ export default function CodingRoomPage({
     }
 
     fetchRoom()
+
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe()
+      }
+    }
   }, [roomId])
 
   // Auto-save code with debouncing
