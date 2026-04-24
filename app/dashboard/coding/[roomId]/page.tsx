@@ -1,25 +1,69 @@
 "use client"
 
-import { use, useState, useEffect, useTransition, useRef } from "react"
+import { use, useState, useEffect } from "react"
 import { DUMMY_COLLAB_ROOMS } from "@/lib/dummy-data"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { ArrowLeft, Copy, Save, Users, Check } from "lucide-react"
+import { ArrowLeft, Copy, Check } from "lucide-react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
-import { saveRoomCodeAction, updateRoomLanguageAction } from "@/app/actions/data"
-import { CodeEditor } from "@/components/code-editor"
-
-const PRESENCE_USERS = [
-  { name: "You", color: "bg-chart-1" },
-]
+import { RoomProvider } from "@liveblocks/react"
+import { CollaborativeCodeEditor } from "@/components/collaborative-code-editor"
+import { liveblocks } from "@/lib/liveblocks"
 
 interface Room {
   id: string
   name: string
   language: string
   code: string
+}
+
+function CodingRoomContent({ roomId, room }: { roomId: string; room: Room }) {
+  const [copied, setCopied] = useState(false)
+
+  function handleCopyLink() {
+    navigator.clipboard.writeText(`${window.location.origin}/dashboard/coding/${roomId}`)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="flex h-[calc(100vh-8rem)] flex-col gap-4">
+      {/* Top bar */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/dashboard/coding">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-lg font-bold text-foreground">{room.name}</h1>
+            <p className="text-xs text-muted-foreground mt-1">
+              Real-time collaborative editor powered by Liveblocks
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 md:gap-3">
+          <Button variant="outline" size="sm" className="gap-2" onClick={handleCopyLink}>
+            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            <span className="hidden sm:inline">{copied ? "Copied" : "Share"}</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* Collaborative code editor */}
+      <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card">
+        <CollaborativeCodeEditor
+          initialCode={room.code || "// Start coding...\n"}
+          initialLanguage={room.language || "javascript"}
+          roomId={roomId}
+        />
+      </div>
+    </div>
+  )
 }
 
 export default function CodingRoomPage({
@@ -29,24 +73,11 @@ export default function CodingRoomPage({
 }) {
   const { roomId } = use(params)
   const [room, setRoom] = useState<Room | null>(null)
-  const [code, setCode] = useState("")
-  const [language, setLanguage] = useState("javascript")
-  const [copied, setCopied] = useState(false)
-  const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [isPending, startTransition] = useTransition()
-  const [externalChange, setExternalChange] = useState(false)
-  const saveTimeoutRef = useRef<NodeJS.Timeout>()
 
-  // Fetch initial room data and set up real-time subscription
   useEffect(() => {
-    let subscription: any = null
-
     async function fetchRoom() {
       const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
 
       try {
         // Try fetching from Supabase
@@ -58,44 +89,11 @@ export default function CodingRoomPage({
 
         if (data) {
           setRoom(data)
-          setCode(data.code || "// Start coding...\n")
-          setLanguage(data.language || "javascript")
           setLoading(false)
-
-          // Set up real-time subscription for changes from other users
-          subscription = supabase
-            .channel(`room:${roomId}`)
-            .on(
-              "postgres_changes",
-              {
-                event: "UPDATE",
-                schema: "public",
-                table: "collab_rooms",
-                filter: `id=eq.${roomId}`,
-              },
-              (payload: any) => {
-                if (payload.new) {
-                  setExternalChange(true)
-                  setCode(payload.new.code || "")
-                  setLanguage(payload.new.language || "javascript")
-                  setRoom((prev) => prev ? { ...prev, ...payload.new } : null)
-                  // Clear the external change indicator after 2 seconds
-                  setTimeout(() => setExternalChange(false), 2000)
-                }
-              }
-            )
-            .subscribe((status: string) => {
-              if (status === "SUBSCRIBED") {
-              }
-            })
-
-          return () => {
-            if (subscription) {
-              subscription.unsubscribe()
-            }
-          }
+          return
         }
       } catch (error) {
+        console.log("Error fetching from Supabase, using dummy data")
       }
 
       // Fallback to dummy data
@@ -107,43 +105,12 @@ export default function CodingRoomPage({
           language: dummyRoom.language,
           code: dummyRoom.content,
         })
-        setCode(dummyRoom.content)
-        setLanguage(dummyRoom.language)
       }
       setLoading(false)
     }
 
     fetchRoom()
-
-    return () => {
-      if (subscription) {
-        subscription.unsubscribe()
-      }
-    }
   }, [roomId])
-
-  // Auto-save code with debouncing
-  useEffect(() => {
-    if (code === "" || !room) return
-
-    // Clear existing timeout
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current)
-    }
-
-    // Set new timeout for debounced save (save after 1 second of inactivity)
-    saveTimeoutRef.current = setTimeout(() => {
-      if (!externalChange) {
-        handleSave()
-      }
-    }, 1000)
-
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current)
-      }
-    }
-  }, [code, room, externalChange])
 
   if (loading) {
     return (
@@ -164,97 +131,9 @@ export default function CodingRoomPage({
     )
   }
 
-  function handleCopyLink() {
-    navigator.clipboard.writeText(`${window.location.origin}/dashboard/coding/${roomId}`)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  function handleSave() {
-    startTransition(async () => {
-      await saveRoomCodeAction(roomId, code)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    })
-  }
-
-  function handleLanguageChange(newLanguage: string) {
-    setLanguage(newLanguage)
-    startTransition(async () => {
-      await updateRoomLanguageAction(roomId, newLanguage)
-    })
-  }
-
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col gap-4">
-      {/* Top bar */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/dashboard/coding">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-lg font-bold text-foreground">{room.name}</h1>
-            <div className="flex flex-wrap items-center gap-2 mt-1">
-              <Badge variant="secondary" className="font-mono text-xs">
-                {language}
-              </Badge>
-              <span className="text-xs text-muted-foreground">
-                {externalChange ? "Syncing..." : "Real-time Editor"}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 md:gap-3">
-          <div className="flex items-center gap-1">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <div className="flex -space-x-2">
-              {PRESENCE_USERS.map((u) => (
-                <Avatar key={u.name} className="h-7 w-7 border-2 border-background">
-                  <AvatarFallback className={`${u.color} text-xs text-primary-foreground`}>
-                    {u.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")}
-                  </AvatarFallback>
-                </Avatar>
-              ))}
-            </div>
-          </div>
-
-          <Button variant="outline" size="sm" className="gap-2" onClick={handleCopyLink}>
-            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-            <span className="hidden sm:inline">{copied ? "Copied" : "Share"}</span>
-          </Button>
-
-          <Button
-            size="sm"
-            className="gap-2"
-            onClick={handleSave}
-            disabled={isPending || saved}
-          >
-            {saved ? <Check className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
-            <span className="hidden sm:inline">
-              {saved ? "Saved" : isPending ? "Saving..." : "Save"}
-            </span>
-          </Button>
-        </div>
-      </div>
-
-      {/* Code editor area */}
-      <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card">
-        <CodeEditor
-          code={code}
-          language={language}
-          onCodeChange={setCode}
-          onLanguageChange={handleLanguageChange}
-          height="100%"
-          roomName={room.name}
-        />
-      </div>
-    </div>
+    <RoomProvider id={roomId} initialPresence={{ cursor: null }}>
+      <CodingRoomContent roomId={roomId} room={room} />
+    </RoomProvider>
   )
 }
