@@ -122,4 +122,36 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Markdown editor bullet points and lists visibility */
+  .dark [data-color-mode="dark"] ul > li::marker,
+  [data-color-mode="dark"] ul > li::marker {
+    color: oklch(0.72 0.19 155);
+  }
+
+  .dark [data-color-mode="dark"] ol > li::marker,
+  [data-color-mode="dark"] ol > li::marker {
+    color: oklch(0.72 0.19 155);
+  }
+
+  .dark [data-color-mode="dark"] ul,
+  [data-color-mode="dark"] ul {
+    color: oklch(0.97 0 0);
+  }
+
+  .dark [data-color-mode="dark"] ol,
+  [data-color-mode="dark"] ol {
+    color: oklch(0.97 0 0);
+  }
+
+  .dark [data-color-mode="dark"] pre,
+  [data-color-mode="dark"] pre {
+    background-color: oklch(0.13 0.005 260);
+    color: oklch(0.97 0 0);
+  }
+
+  .dark [data-color-mode="dark"] code,
+  [data-color-mode="dark"] code {
+    color: oklch(0.97 0 0);
+  }
 }
