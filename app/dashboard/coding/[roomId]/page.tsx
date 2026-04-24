@@ -1,6 +1,6 @@
 "use client"
 
-import { use, useState, useEffect, useTransition } from "react"
+import { use, useState, useEffect, useTransition, useRef } from "react"
 import { DUMMY_COLLAB_ROOMS } from "@/lib/dummy-data"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -35,13 +35,19 @@ export default function CodingRoomPage({
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(true)
   const [isPending, startTransition] = useTransition()
+  const [externalChange, setExternalChange] = useState(false)
+  const saveTimeoutRef = useRef<NodeJS.Timeout>()
 
+  // Fetch initial room data and set up real-time subscription
   useEffect(() => {
     async function fetchRoom() {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
-      if (user) {
+      try {
+        // Try fetching from Supabase
         const { data } = await supabase
           .from("collab_rooms")
           .select("*")
@@ -53,11 +59,40 @@ export default function CodingRoomPage({
           setCode(data.code || "// Start coding...\n")
           setLanguage(data.language || "javascript")
           setLoading(false)
-          return
+
+          // Set up real-time subscription for changes
+          const subscription = supabase
+            .channel(`room:${roomId}`)
+            .on(
+              "postgres_changes",
+              {
+                event: "UPDATE",
+                schema: "public",
+                table: "collab_rooms",
+                filter: `id=eq.${roomId}`,
+              },
+              (payload: any) => {
+                if (payload.new) {
+                  console.log("[v0] Real-time update received:", payload.new)
+                  setExternalChange(true)
+                  setCode(payload.new.code || "")
+                  setLanguage(payload.new.language || "javascript")
+                  // Clear the external change indicator after 2 seconds
+                  setTimeout(() => setExternalChange(false), 2000)
+                }
+              }
+            )
+            .subscribe()
+
+          return () => {
+            subscription.unsubscribe()
+          }
         }
+      } catch (error) {
+        console.log("[v0] Error fetching from Supabase, using dummy data")
       }
 
-      // Fallback to dummy
+      // Fallback to dummy data
       const dummyRoom = DUMMY_COLLAB_ROOMS.find((r) => r.id === roomId)
       if (dummyRoom) {
         setRoom({
@@ -71,8 +106,32 @@ export default function CodingRoomPage({
       }
       setLoading(false)
     }
+
     fetchRoom()
   }, [roomId])
+
+  // Auto-save code with debouncing
+  useEffect(() => {
+    if (code === "" || !room) return
+
+    // Clear existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+    }
+
+    // Set new timeout for debounced save (save after 1 second of inactivity)
+    saveTimeoutRef.current = setTimeout(() => {
+      if (!externalChange) {
+        handleSave()
+      }
+    }, 1000)
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+    }
+  }, [code, room, externalChange])
 
   if (loading) {
     return (
@@ -127,8 +186,12 @@ export default function CodingRoomPage({
           <div>
             <h1 className="text-lg font-bold text-foreground">{room.name}</h1>
             <div className="flex flex-wrap items-center gap-2 mt-1">
-              <Badge variant="secondary" className="font-mono text-xs">{language}</Badge>
-              <span className="text-xs text-muted-foreground">Real-time Editor</span>
+              <Badge variant="secondary" className="font-mono text-xs">
+                {language}
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                {externalChange ? "Syncing..." : "Real-time Editor"}
+              </span>
             </div>
           </div>
         </div>
@@ -140,7 +203,10 @@ export default function CodingRoomPage({
               {PRESENCE_USERS.map((u) => (
                 <Avatar key={u.name} className="h-7 w-7 border-2 border-background">
                   <AvatarFallback className={`${u.color} text-xs text-primary-foreground`}>
-                    {u.name.split(" ").map((n) => n[0]).join("")}
+                    {u.name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")}
                   </AvatarFallback>
                 </Avatar>
               ))}
@@ -152,9 +218,16 @@ export default function CodingRoomPage({
             <span className="hidden sm:inline">{copied ? "Copied" : "Share"}</span>
           </Button>
 
-          <Button size="sm" className="gap-2" onClick={handleSave} disabled={isPending}>
+          <Button
+            size="sm"
+            className="gap-2"
+            onClick={handleSave}
+            disabled={isPending || saved}
+          >
             {saved ? <Check className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
-            <span className="hidden sm:inline">{saved ? "Saved" : isPending ? "Saving..." : "Save"}</span>
+            <span className="hidden sm:inline">
+              {saved ? "Saved" : isPending ? "Saving..." : "Save"}
+            </span>
           </Button>
         </div>
       </div>

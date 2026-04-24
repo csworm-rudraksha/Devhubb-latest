@@ -1,8 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import Editor, { OnChange, OnMount } from "@monaco-editor/react"
-import * as monaco from "monaco-editor"
+import React, { useEffect, useState } from "react"
+import dynamic from "next/dynamic"
 import {
   Select,
   SelectContent,
@@ -10,6 +9,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+
+// Dynamically import Monaco Editor without SSR
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full items-center justify-center rounded-lg border border-border bg-secondary/50">
+      <p className="text-muted-foreground">Loading editor...</p>
+    </div>
+  ),
+})
 
 const LANGUAGES = [
   { value: "javascript", label: "JavaScript", ext: "js" },
@@ -51,27 +60,21 @@ export function CodeEditor({
   height = "400px",
   roomName = "untitled",
 }: CodeEditorProps) {
-  const [mounted, setMounted] = useState(false)
   const editorRef = React.useRef<any>(null)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  const handleEditorMount: OnMount = (editor, monaco) => {
+  const handleEditorMount = (editor: any) => {
     editorRef.current = editor
-  }
-
-  const handleCodeChange: OnChange = (value) => {
-    if (value !== undefined) {
-      onCodeChange(value)
-    }
   }
 
   if (!mounted) {
     return (
       <div className="flex h-full items-center justify-center rounded-lg border border-border bg-secondary/50">
-        <p className="text-muted-foreground">Loading editor...</p>
+        <p className="text-muted-foreground">Initializing editor...</p>
       </div>
     )
   }
@@ -80,9 +83,9 @@ export function CodeEditor({
   const fileExtension = selectedLanguage?.ext || "txt"
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 h-full">
       {/* Language selector */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between px-4 pt-4">
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">Language:</span>
           <Select value={language} onValueChange={onLanguageChange}>
@@ -104,12 +107,12 @@ export function CodeEditor({
       </div>
 
       {/* Monaco Editor */}
-      <div className="rounded-lg border border-border overflow-hidden">
-        <Editor
-          height={height}
+      <div className="flex-1 overflow-hidden rounded-lg border border-border">
+        <MonacoEditor
+          height="100%"
           language={language}
           value={code}
-          onChange={handleCodeChange}
+          onChange={(value) => onCodeChange(value || "")}
           onMount={handleEditorMount}
           theme="vs-dark"
           options={{
@@ -124,12 +127,10 @@ export function CodeEditor({
             formatOnPaste: true,
             formatOnType: true,
             bracketPairColorization: { enabled: true },
+            padding: { top: 12, bottom: 12 },
           }}
         />
       </div>
     </div>
   )
 }
-
-// Re-export React for useRef
-import React from "react"
