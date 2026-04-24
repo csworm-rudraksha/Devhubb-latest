@@ -150,6 +150,7 @@ export default function NotesPage() {
                     {new Date(nb.updated_at).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
+                      year: new Date(nb.updated_at).getFullYear() !== new Date().getFullYear() ? "numeric" : undefined,
                     })}
                   </span>
                 </div>
