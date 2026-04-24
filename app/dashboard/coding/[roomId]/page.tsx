@@ -10,7 +10,7 @@ import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { RoomProvider } from "@liveblocks/react"
 import { CollaborativeCodeEditor } from "@/components/collaborative-code-editor"
-import { liveblocks } from "@/lib/liveblocks"
+import { LiveblocksWrapper } from "@/components/liveblocks-provider"
 
 interface Room {
   id: string
@@ -132,8 +132,10 @@ export default function CodingRoomPage({
   }
 
   return (
-    <RoomProvider id={roomId} initialPresence={{ cursor: null }}>
-      <CodingRoomContent roomId={roomId} room={room} />
-    </RoomProvider>
+    <LiveblocksWrapper>
+      <RoomProvider id={roomId} initialPresence={{ cursor: null }}>
+        <CodingRoomContent roomId={roomId} room={room} />
+      </RoomProvider>
+    </LiveblocksWrapper>
   )
 }
