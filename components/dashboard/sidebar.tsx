@@ -12,6 +12,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  FileCheck,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useState, useTransition } from "react"
@@ -21,6 +22,7 @@ const navItems = [
   { href: "/dashboard/overview", label: "Overview", icon: BarChart3 },
   { href: "/dashboard/notes", label: "Notes", icon: FileText },
   { href: "/dashboard/coding", label: "Coding", icon: Code },
+  { href: "/resume", label: "Resume", icon: FileCheck },
   { href: "/dashboard/profile", label: "Profile", icon: User },
 ]
 
