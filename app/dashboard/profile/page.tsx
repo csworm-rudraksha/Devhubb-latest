@@ -31,6 +31,7 @@ interface Profile {
   city: string
   bio: string
   github_url: string
+  leetcode_username: string
   linkedin_url: string
   twitter_url: string
   phone_number: string
@@ -44,40 +45,42 @@ export default function ProfilePage() {
   const [editing, setEditing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [isPending, startTransition] = useTransition()
+  const [leetcodeUsername, setLeetcodeUsername] = useState("")
 
   useEffect(() => {
     async function fetchProfile() {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user ?? null
 
       if (user) {
         const { data } = await supabase
           .from("profiles")
-          .select("*")
+          .select("full_name, handle, college, city, bio, github_url, linkedin_url, twitter_url, phone_number, is_public, leetcode_username")
           .eq("id", user.id)
           .single()
 
         if (data) {
-          setProfile(data)
+          setProfile({
+            full_name: data.full_name,
+            handle: data.handle,
+            college: data.college,
+            city: data.city,
+            bio: data.bio,
+            github_url: data.github_url,
+            linkedin_url: data.linkedin_url,
+            twitter_url: data.twitter_url,
+            phone_number: data.phone_number,
+            is_public: data.is_public,
+            leetcode_username: data.leetcode_username,
+          })
           setIsPublic(data.is_public ?? true)
+          setLeetcodeUsername(data?.leetcode_username ?? "")
           setLoading(false)
           return
         }
       }
 
-      // Fallback to dummy
-      setProfile({
-        full_name: DUMMY_USER.fullName,
-        handle: DUMMY_USER.handle,
-        college: DUMMY_USER.college,
-        city: DUMMY_USER.city,
-        bio: DUMMY_USER.bio,
-        github_url: DUMMY_USER.githubUrl,
-        linkedin_url: DUMMY_USER.linkedinUrl,
-        twitter_url: DUMMY_USER.twitterUrl,
-        phone_number: DUMMY_USER.phoneNumber,
-        is_public: DUMMY_USER.isPublic,
-      })
       setLoading(false)
     }
     fetchProfile()
@@ -107,7 +110,7 @@ export default function ProfilePage() {
 
   function handleSaveProfile(formData: FormData) {
     startTransition(async () => {
-      const result = await updateProfileAction(formData)
+      const result = await updateProfileAction(formData, leetcodeUsername)
       if (result.success) {
         setProfile({
           ...profile!,
@@ -117,6 +120,7 @@ export default function ProfilePage() {
           city: formData.get("city") as string,
           bio: formData.get("bio") as string,
           github_url: formData.get("github_url") as string,
+          leetcode_username: leetcodeUsername,
           linkedin_url: formData.get("linkedin_url") as string,
           twitter_url: formData.get("twitter_url") as string,
         })
@@ -206,6 +210,13 @@ export default function ProfilePage() {
                   <div className="flex flex-col gap-2">
                     <Label>GitHub URL</Label>
                     <Input name="github_url" defaultValue={profile.github_url || ""} />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label>LeetCode Username</Label>
+                    <Input
+                      value={leetcodeUsername}
+                      onChange={(e) => setLeetcodeUsername(e.target.value)}
+                    />
                   </div>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="flex flex-col gap-2">
