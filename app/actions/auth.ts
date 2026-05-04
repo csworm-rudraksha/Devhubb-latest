@@ -53,7 +53,7 @@ export async function signOutAction() {
   redirect("/")
 }
 
-export async function updateProfileAction(formData: FormData) {
+export async function updateProfileAction(formData: FormData, leetcodeUsername?: string) {
   const supabase = await createClient()
   const {
     data: { user },
@@ -81,6 +81,10 @@ export async function updateProfileAction(formData: FormData) {
     if (value !== null) {
       updates[field] = value as string
     }
+  }
+
+  if (leetcodeUsername !== undefined) {
+    updates.leetcode_username = leetcodeUsername
   }
 
   updates.updated_at = new Date().toISOString()
