@@ -1,8 +1,11 @@
 "use client"
 
+import { useState } from "react"
 import { useGithubStats } from "@/hooks/use-github-stats"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Github, Star, GitFork, Users } from "lucide-react"
+import { PlatformUsernameInput } from "@/components/dashboard/platform-username-input"
+import { createClient } from "@/lib/supabase/client"
 import {
   BarChart,
   Bar,
@@ -12,10 +15,17 @@ import {
   Tooltip,
 } from "recharts"
 
-export function GithubStatsSection({ githubUrl }: { githubUrl: string | null }) {
-  const { data, loading, error } = useGithubStats(githubUrl)
+export function GithubStatsSection({ githubUrl, userId }: { githubUrl: string | null; userId: string }) {
+  const [currentGithubUrl, setCurrentGithubUrl] = useState(githubUrl)
+  const { data, loading, error } = useGithubStats(currentGithubUrl)
 
-  if (!githubUrl) {
+  const handleSaveGithubUrl = async (value: string) => {
+    const supabase = createClient()
+    await supabase.from("profiles").update({ github_url: value || null }).eq("id", userId)
+    setCurrentGithubUrl(value || null)
+  }
+
+  if (!currentGithubUrl) {
     return (
       <div>
         <div className="mb-4 flex items-center gap-2">
@@ -23,8 +33,14 @@ export function GithubStatsSection({ githubUrl }: { githubUrl: string | null }) 
           <h2 className="text-lg font-semibold text-foreground">GitHub</h2>
         </div>
         <Card className="border-border bg-card">
-          <CardContent className="p-6 text-center">
-            <p className="text-sm text-muted-foreground">Add your GitHub URL in Settings to see your stats</p>
+          <CardContent className="p-6">
+            <PlatformUsernameInput
+              platform="github"
+              label="GitHub URL"
+              placeholder="https://github.com/username"
+              currentValue={currentGithubUrl}
+              onSave={handleSaveGithubUrl}
+            />
           </CardContent>
         </Card>
       </div>
@@ -73,6 +89,16 @@ export function GithubStatsSection({ githubUrl }: { githubUrl: string | null }) 
         <Github className="h-5 w-5 text-foreground" />
         <h2 className="text-lg font-semibold text-foreground">GitHub</h2>
         <span className="text-sm text-muted-foreground">@{data.login}</span>
+      </div>
+
+      <div className="mb-4">
+        <PlatformUsernameInput
+          platform="github"
+          label="GitHub URL"
+          placeholder="https://github.com/username"
+          currentValue={currentGithubUrl}
+          onSave={handleSaveGithubUrl}
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

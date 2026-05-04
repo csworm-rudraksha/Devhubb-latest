@@ -1,14 +1,24 @@
 "use client"
 
+import { useState } from "react"
 import { useLeetcodeStats } from "@/hooks/use-leetcode-stats"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Trophy, Target, TrendingUp } from "lucide-react"
+import { PlatformUsernameInput } from "@/components/dashboard/platform-username-input"
+import { createClient } from "@/lib/supabase/client"
 
-export function LeetcodeStatsSection({ leetcodeUsername }: { leetcodeUsername: string | null }) {
-  const { data, loading, error } = useLeetcodeStats(leetcodeUsername)
+export function LeetcodeStatsSection({ leetcodeUsername, userId }: { leetcodeUsername: string | null; userId: string }) {
+  const [currentLeetcodeUsername, setCurrentLeetcodeUsername] = useState(leetcodeUsername)
+  const { data, loading, error } = useLeetcodeStats(currentLeetcodeUsername)
 
-  if (!leetcodeUsername) {
+  const handleSaveLeetcodeUsername = async (value: string) => {
+    const supabase = createClient()
+    await supabase.from("profiles").update({ leetcode_username: value || null }).eq("id", userId)
+    setCurrentLeetcodeUsername(value || null)
+  }
+
+  if (!currentLeetcodeUsername) {
     return (
       <div>
         <div className="mb-4 flex items-center gap-2">
@@ -20,8 +30,14 @@ export function LeetcodeStatsSection({ leetcodeUsername }: { leetcodeUsername: s
           <h2 className="text-lg font-semibold text-foreground">LeetCode</h2>
         </div>
         <Card className="border-border bg-card">
-          <CardContent className="p-6 text-center">
-            <p className="text-sm text-muted-foreground">Add your LeetCode username in Settings to see your stats</p>
+          <CardContent className="p-6">
+            <PlatformUsernameInput
+              platform="leetcode"
+              label="LeetCode Username"
+              placeholder="your_leetcode_username"
+              currentValue={currentLeetcodeUsername}
+              onSave={handleSaveLeetcodeUsername}
+            />
           </CardContent>
         </Card>
       </div>
@@ -87,6 +103,16 @@ export function LeetcodeStatsSection({ leetcodeUsername }: { leetcodeUsername: s
         </div>
         <h2 className="text-lg font-semibold text-foreground">LeetCode</h2>
         <span className="text-sm text-muted-foreground">@{data.username}</span>
+      </div>
+
+      <div className="mb-4">
+        <PlatformUsernameInput
+          platform="leetcode"
+          label="LeetCode Username"
+          placeholder="your_leetcode_username"
+          currentValue={currentLeetcodeUsername}
+          onSave={handleSaveLeetcodeUsername}
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
